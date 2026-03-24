@@ -12,17 +12,7 @@ import (
 )
 
 
-type Point struct{
-	X float64
-	Y float64
-	Z float64
-}
-type Task struct{
-	ID string
-	Category
 
-
-}
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize : 1024,
@@ -45,13 +35,15 @@ func NewClient(id string, conn *websocket.Conn, hub *Hub) *Client {
 	return &Client{ID:id,Conn:conn, send: make(chan Message)}
 }
 
+
 func (c *Client) Read(){
 	defer func(){
 		c.hub.unregister <- c
 		c.Conn.Close()
 	}()
 
-	
+	c.Conn.SetReadLimit(maxMessageSize)
+	c.Conn.SetReadDeadline(time.now)
 
 	
 	
