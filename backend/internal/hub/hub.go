@@ -16,7 +16,7 @@ import (
 type Hub struct{
 	register chan *Client
 	unregister chan *Client
-	clients map[string]map[*Client]bool //nested map
+	clients map[*Client]bool //nested map
 	broadcast chan Task
 }
 
@@ -53,7 +53,7 @@ type Task struct {
 
 func NewHub() *Hub{
 	return &Hub{
-		clients: make(map[string]map[*Client]bool)
+		clients: make(map[*Client]bool)
 		register: make(chan *Client)
 		unregister: make(chan *Client)
 		broadcast: make(chan Task)
@@ -76,50 +76,38 @@ func Run(h *Hub){
 
 
 func (h *Hub) RegisterClient(c *Client){
-	conn := h.clients[c.ID]
-	if conn == nil{
-		conn := make(map[*Client]bool)
-		h.clients[c.ID] = conn
-	}
-	h.clients[c.ID][c] = true
+	h.clients[c] = true
 
 }
 
 func (h *Hub) UnRegisterClient(c *Client){
 	if _,ok:=h.clients[c.ID]; ok{
 		delete(h.clients[c.ID], c)
-		close(client.send)
+		close(c.send)
 	}
 
 }
 
-func (h *Hub) BroadcastTask(task Task){
-	
-	for _, clientGroup := range h.clients {
-		for client := range clientGroup {
-			select {
-			case client.send <- task:
-			default:
-				close(client.send)
-				delete(clientGroup, client)
-			}
+func (h *Hub) BroadcastTask(task Task) {
+	for client := range h.clients {
+		select {
+		case client.send <- task:
+		default:
+			close(client.send)
+			delete(h.clients, client)
 		}
 	}
-
-
 }
 
-func (h *Hub) StartTick(){
+func (h *Hub) StartTick() {
 	ticker := time.NewTicker(500 * time.Millisecond)
-	go func(){
+	go func() {
 		defer ticker.Stop()
 		for range ticker.C {
 			task := GenerateTask()
 			h.broadcast <- task
 		}
-	}
-	
-
+	}()
 }
 
 

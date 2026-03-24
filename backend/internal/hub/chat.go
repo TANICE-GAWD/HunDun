@@ -5,7 +5,7 @@ package hub
 import (
 	"fmt"
 	"net/http"
-
+	"github.com/google/uuid"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
@@ -16,6 +16,7 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize : 1024,
 	WriteBufferSize : 1024,
+	CheckOrigin: func(r *http.Request) bool { return true },
 	
 }
 
@@ -23,7 +24,7 @@ var upgrader = websocket.Upgrader{
 type Client struct{
 	ID string
 	Conn *websocket.Conn
-	send chan Message
+	send chan Task
 	hub *Hub
 }
 
@@ -31,7 +32,7 @@ type Client struct{
 
 
 func NewClient(id string, conn *websocket.Conn, hub *Hub) *Client {
-	return &Client{ID:id,Conn:conn, send: make(chan Message)}
+	return &Client{ID: id, Conn: conn, send: make(chan Task), hub: hub}
 }
 
 
@@ -41,24 +42,47 @@ func (c *Client) Read(){
 		c.Conn.Close()
 	}()
 
-	c.Conn.SetReadLimit(maxMessageSize)
-	c.Conn.SetReadDeadline(time.now)
+	c.Conn.SetReadLimit(512)
+	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 
 	
 	
-	for{
-		var msg Message
-		c.hub.broadcast <- msg
+	for {
+		if _, _, err := c.Conn.ReadMessage(); err != nil {
+			break
+		}
 	}
-
 
 
 }
 
+func (c *Client) Write() {
+	defer func() {
+		c.Conn.Close()
+	}()
 
+	for task := range c.send {
+		if err := c.Conn.WriteJSON(task); err != nil {
+			break
+		}
+	}
+}
 
 
 func (c *Client) Close(){
 	close(c.send)
 }
 
+func ServeWs(h *hub.Hub, c *gin.Context) {
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+
+	client := NewClient(uuid.New().String(), conn, h)
+
+	h.Register <- client
+
+	go client.Read()
+	go client.Write()
+}
