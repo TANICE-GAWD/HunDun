@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	// "github.com/orsinium-labs/enum"
 	"math/rand"
+	"time"
 )
 
 
@@ -16,16 +17,10 @@ type Hub struct{
 	register chan *Client
 	unregister chan *Client
 	clients map[string]map[*Client]bool //nested map
-	broadcast chan *Task
+	broadcast chan Task
 }
 
-// type Message struct{
-// 	Sender string `json:"sender"`
-// 	Receiver string `json:"receiver"`
-// 	Content string `json:"content"`
-// 	ID string `json:"id"`
-// 	Type string `json:"type"`
-// }
+
 
 type CategoryEnum string
 
@@ -51,27 +46,7 @@ type Task struct {
 	Coordinates Vector3      `json:"coordinates"`
 }
 
-ticker := time.Newticker(500 * time.Millisecond)
-defer ticker.Stop()
-for range ticker.C {
-	task := GenerateTask()
-	h.broadcast <- task
-	
-}
 
-
-func GenerateTask() (t *Task){
-	return &Task{
-		ID: uuid.New().String(),
-		Category : categories[rand.Intn(len(categories))],
-		// Category: categories.Choice(0),
-		Coordinates: Vector3{
-			X: rand.Float64() * 100,
-			Y: rand.Float64() * 100,
-			Z: rand.Float64() * 100,
-		},
-	}
-}
 
 
 
@@ -93,7 +68,7 @@ func Run(h *Hub){
 		case client := <- h.unregister:
 			h.UnRegisterClient(client)
 		case task := <- h.broadcast:
-			h.TaskHandler(task)
+			h.BroadcastTask(task)
 
 		}
 	}
@@ -118,39 +93,46 @@ func (h *Hub) UnRegisterClient(c *Client){
 
 }
 
-func (h *Hub) MessageHandler(message *Message){
-	// if message.Type == "message"{
-	// 	clients := h.clients[message.ID]
-	// 	for client := range clients{
-	// 		select{
-	// 		case client.send <- message:
-	// 		default:
-	// 			close(client.send)
-	// 			delete(h.clients[message.ID],client)
-	// 		}
-	// 	}
-	// }
-	// else if message.Type == "notification"{
-	// 	clients:= h.clients[message.Receiver]
-	// 	for client := range clients{
-	// 		select{
-	// 		case client.send <- message:
-	// 		default:
-	// 			close(client.send)
-	// 			delete(h.clients[message.Receiver],client)
-	// 		}
-	// 	}
-	// }
+func (h *Hub) BroadcastTask(task Task){
 	
-	clients := h.clients
-	for i := range clients{
-		select{
-		case h.clients[i].send <- message:
-		default:
-			close(i.send)
-			delete(h.clients[message.ID],h.clients[i])
+	for _, clientGroup := range h.clients {
+		for client := range clientGroup {
+			select {
+			case client.send <- task:
+			default:
+				close(client.send)
+				delete(clientGroup, client)
+			}
 		}
 	}
 
 
+}
+
+func (h *Hub) StartTick(){
+	ticker := time.NewTicker(500 * time.Millisecond)
+	go func(){
+		defer ticker.Stop()
+		for range ticker.C {
+			task := GenerateTask()
+			h.broadcast <- task
+		}
+	}
+	
+
+}
+
+
+
+func GenerateTask() Task{
+	return Task{
+		ID: uuid.New().String(),
+		Category : categories[rand.Intn(len(categories))],
+		// Category: categories.Choice(0),
+		Coordinates: Vector3{
+			X: rand.Float64() * 100,
+			Y: rand.Float64() * 100,
+			Z: rand.Float64() * 100,
+		},
+	}
 }
