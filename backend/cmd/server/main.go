@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"your_module_path/internal/hub"
+	"backend/internal/hub"
 )
 
 func main() {

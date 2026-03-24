@@ -1,9 +1,8 @@
 //ticker >> generate task >> send to hub >> hub >> all clients
 
-package chat
+package hub
 
 import (
-	"fmt"
 	// "github.com/EliCDavis/vector/vector3"
 	"github.com/google/uuid"
 	// "github.com/orsinium-labs/enum"
@@ -53,10 +52,10 @@ type Task struct {
 
 func NewHub() *Hub{
 	return &Hub{
-		clients: make(map[*Client]bool)
-		register: make(chan *Client)
-		unregister: make(chan *Client)
-		broadcast: make(chan Task)
+		clients: make(map[*Client]bool),
+		register: make(chan *Client),
+		unregister: make(chan *Client),
+		broadcast: make(chan Task),
 	}
 }
 
@@ -80,12 +79,11 @@ func (h *Hub) RegisterClient(c *Client){
 
 }
 
-func (h *Hub) UnRegisterClient(c *Client){
-	if _,ok:=h.clients[c.ID]; ok{
-		delete(h.clients[c.ID], c)
+func (h *Hub) UnRegisterClient(c *Client) {
+	if _, ok := h.clients[c]; ok {
+		delete(h.clients, c)
 		close(c.send)
 	}
-
 }
 
 func (h *Hub) BroadcastTask(task Task) {

@@ -3,7 +3,7 @@
 package hub
 
 import (
-	"fmt"
+	"time"
 	"net/http"
 	"github.com/google/uuid"
 	"github.com/gin-gonic/gin"
@@ -73,7 +73,7 @@ func (c *Client) Close(){
 	close(c.send)
 }
 
-func ServeWs(h *hub.Hub, c *gin.Context) {
+func ServeWs(h *Hub, c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
@@ -81,7 +81,7 @@ func ServeWs(h *hub.Hub, c *gin.Context) {
 
 	client := NewClient(uuid.New().String(), conn, h)
 
-	h.Register <- client
+	h.register <- client
 
 	go client.Read()
 	go client.Write()
